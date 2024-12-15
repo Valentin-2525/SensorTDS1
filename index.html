@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor de Calidad del Agua</title>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js" type="text/javascript" charset="utf-8"></script>
+    <script src="raphael-2.1.4.min.js"></script>
+    <script src="justgage.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f9;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        h1 {
+            background-color: #6200ea;
+            color: white;
+            padding: 15px 0;
+            margin: 0 0 20px 0;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            padding: 20px;
+        }
+        .gauge {
+            width: 250px;
+            height: 200px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            padding: 10px;
+        }
+        #qualityMessage {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            color: white;
+            font-size: 1.2em;
+            font-weight: bold;
+            text-align: center;
+            transition: background-color 0.5s, box-shadow 0.5s;
+            max-width: 600px;
+            margin: 20px auto;
+        }
+        .good {
+            background-color: #4caf50;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.6);
+        }
+        .regular {
+            background-color: #ffeb3b;
+            color: #333;
+            box-shadow: 0 4px 15px rgba(255, 235, 59, 0.6);
+        }
+        .bad {
+            background-color: #f44336;
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.6);
+        }
+        icon-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .icon-container i {
+            font-size: 2.5rem;
+            color: #4caf50;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+    <script>
+        var accessToken = "291c431f69691484423b6d04e8813b2169c2e1a0";
+        var deviceID = "e00fce680fc0e5b73b2899b8";
+
+        function callback(data, status, gauge, type) {
+            if (status === "success") {
+                var value = parseFloat(data.result).toFixed(2);
+                gauge.refresh(value);
+                evaluateWaterQuality(type, value);
+            } else {
+                console.error("Error al obtener los datos:", status);
+            }
+        }
+
+        function getReading(type, gauge) {
+            var url = "https://api.particle.io/v1/devices/" + deviceID + "/" + type;
+            $.get(url, { access_token: accessToken }, function(data, status) {
+                callback(data, status, gauge, type);
+            });
+        }
+
+        var tdsValue = 0;
+        var phValue = 0;
+		var tempValue = 0;
+
+        function evaluateWaterQuality(type, value) {
+            if (type === "tdsValue") {
+                tdsValue = value;
+            } else if (type === "phValue") {
+                phValue = value;
+            }
+
+            var message = "";
+            var className = "";
+
+            if (tdsValue < 300 && phValue >= 6.5 && phValue <= 8.5) {
+                message = "Estado: Bueno. El agua tiene una calidad excelente.";
+                className = "good";
+            } else if ((tdsValue >= 300 && tdsValue <= 900) && (phValue >= 6.5 && phValue <= 8.5)) {
+                message = "Estado: Regular. El agua es aceptable, pero podría ser mejor.";
+                className = "regular";
+            } else {
+                message = "Estado: Malo. El agua no es adecuada para consumo.";
+                className = "bad";
+            }
+
+            $("#qualityMessage").text(message).removeClass("good regular bad").addClass(className);
+        }
+
+        $(document).ready(function () {
+            var gaugePH = new JustGage({
+                id: "gaugePH",
+                value: 0,
+                min: 6.5,
+                max: 8.5,
+                title: "pH",
+                decimals: 2,
+                gaugeWidthScale: 0.8,
+                levelColorsGradient: true,
+                levelColors: ["#f44336", "#4caf50", "#f44336"]
+            });
+
+            var gaugeTDS = new JustGage({
+                id: "gaugeTDS",
+                value: 0,
+                min: 0,
+                max: 1200,
+                title: "TDS (ppm)",
+                decimals: 0,
+                gaugeWidthScale: 0.8,
+                levelColorsGradient: true,
+                levelColors: ["#4caf50", "#ffeb3b", "#f44336"]
+            });
+			
+			var gaugeTemperature = new JustGage({ // Indicador para temperatura
+            id: "gaugeTemperature",
+            value: 0,
+            min: 0,
+            max: 50,
+            title: "Temperatura (°C)",
+            decimals: 2,
+            gaugeWidthScale: 0.8,
+            levelColorsGradient: true,
+            levelColors: ["#4caf50", "#ffeb3b", "#f44336"]
+			});
+
+            setInterval(function () { getReading("phValue", gaugePH); }, 7000);
+            setInterval(function () { getReading("tdsValue", gaugeTDS); }, 7000);
+			setInterval(function () { getReading("tempValue", gaugeTemperature); }, 7000);
+        });
+    </script>
+</head>
+<body style="background-image: url('ejemplo2/fondo_gotas.jpg'); background-size: cover; background-repeat: no-repeat;">
+    <header style="text-align: center; margin-bottom: 20px;">
+        <img src="https://via.placeholder.com/150x80?text=Calidad+del+Agua" alt="Logo Calidad del Agua" style="border-radius: 8px;">
+        <h1><i class="fas fa-tint"></i> Monitor de Calidad del Agua</h1>
+    </header>
+    <div class="container">
+        <div id="gaugePH" class="gauge"></div>
+        <div id="gaugeTDS" class="gauge"></div>
+    </div>
+    <div id="qualityMessage">Esperando datos...</div>
+    <div class="icon-container">
+        <i class="fas fa-flask"></i>
+        <span class="gauge-title">Medidor de pH</span>
+    </div>
+    <div id="gaugePH" class="gauge"></div>
+    
+    <div class="icon-container">
+        <i class="fas fa-water"></i>
+        <span class="gauge-title">Medidor de TDS</span>
+    </div>
+    <div id="gaugeTDS" class="gauge"></div>
+	
+	<div class="icon-container">
+        <i class="fas fa-temperature-half"></i>
+        <span class="gauge-title">Medidor de Temperatura</span>
+    </div>
+    <div id="gaugeTtemp" class="gauge"></div>
+</body>
+</html>
+
